@@ -1,0 +1,5 @@
+# Python dependency for the local Chroma server (Python >=3.9; 3.12 recommended).
+# Install from the project root: python -m pip install -r requirements.txt
+# JavaScript dependencies are managed by client/package.json and server/package.json.
+# Skip this installation when using Chroma Cloud instead of a local server.
+chromadb==1.5.9
