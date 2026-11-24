@@ -17,6 +17,9 @@ RUN ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --omit=dev && npm cache clean --fo
 COPY src ./src
 COPY scripts ./scripts
 
+# Download and verify the embedding model before serving requests.
+RUN npm run prepare:embeddings
+
 EXPOSE 10000
 
 CMD ["node", "src/server.js"]

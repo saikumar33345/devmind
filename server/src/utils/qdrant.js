@@ -1,12 +1,7 @@
 import { createHash } from 'node:crypto';
-import { DefaultEmbeddingFunction } from '@chroma-core/default-embed';
+import { embedTexts, EMBEDDING_DIMENSIONS } from './embeddings.js';
 
-const VECTOR_SIZE = 384; // Xenova/all-MiniLM-L6-v2, the existing Chroma embedding model.
-let embeddingFunction;
-const embedLocally = (texts) => {
-  embeddingFunction ??= new DefaultEmbeddingFunction();
-  return embeddingFunction.generate(texts);
-};
+const VECTOR_SIZE = EMBEDDING_DIMENSIONS;
 
 // One physical collection avoids an HNSW index per project on a small free cluster.
 // Every operation is scoped by the logical project/study collection in its payload.
@@ -24,7 +19,7 @@ const pointId = (namespace, chunkId) => {
 };
 
 export const createQdrantStore = ({
-  url, apiKey, collectionName = 'devmind_chunks', embed = embedLocally, fetchImpl = globalThis.fetch
+  url, apiKey, collectionName = 'devmind_chunks', embed = embedTexts, fetchImpl = globalThis.fetch
 }) => {
   if (!url || !apiKey) throw new Error('Set both QDRANT_URL and QDRANT_API_KEY in server/.env or the hosting environment');
   const endpoint = new URL(url);

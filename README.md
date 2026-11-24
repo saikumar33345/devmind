@@ -74,7 +74,7 @@ npm --prefix client run dev
 
 Open `http://localhost:5173`. On Windows, `run.bat` opens both services in separate terminals.
 
-Embeddings run locally in the backend and download their model on first use. The default reranker also runs locally. Set `RERANKER_PROVIDER=llm` to use Sarvam for reranking instead.
+Embeddings run locally in the backend. Local development downloads the model on first use; the Docker build downloads and verifies it before deployment. The default reranker also runs locally. Set `RERANKER_PROVIDER=llm` to use Sarvam for reranking instead.
 
 ## Commands
 
@@ -83,6 +83,7 @@ Run these commands from the repository root:
 | Command | Purpose |
 | --- | --- |
 | `npm --prefix server test` | Run backend tests |
+| `npm --prefix server run prepare:embeddings` | Download and verify the embedding model |
 | `npm --prefix server run check:qdrant` | Check the Qdrant connection without changing data |
 | `npm --prefix client run build` | Build the frontend |
 | `npm --prefix server start` | Start the backend without file watching |

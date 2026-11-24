@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "vitest run",
+    "prepare:embeddings": "node scripts/prepare-embeddings.mjs",
     "check:qdrant": "node scripts/check-qdrant.mjs",
     "migrate:uploads": "node scripts/migrate-uploads.mjs",
     "chroma": "chroma run --path ./chroma_data --port 8000"

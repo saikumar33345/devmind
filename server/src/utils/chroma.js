@@ -1,5 +1,6 @@
 import { ChromaClient, CloudClient } from 'chromadb';
 import { DefaultEmbeddingFunction } from '@chroma-core/default-embed';
+import { embedTexts } from './embeddings.js';
 
 let client = null;
 const getClient = () => {
@@ -31,8 +32,13 @@ const getClient = () => {
 // confidence formula is calibrated against). Computing embeddings client-side with the
 // same model everywhere keeps that calibration valid no matter which backend is active.
 let embeddingFunction = null;
+class SharedEmbeddingFunction extends DefaultEmbeddingFunction {
+  generate(texts) {
+    return embedTexts(texts);
+  }
+}
 const getEmbeddingFunction = () => {
-  if (!embeddingFunction) embeddingFunction = new DefaultEmbeddingFunction();
+  if (!embeddingFunction) embeddingFunction = new SharedEmbeddingFunction();
   return embeddingFunction;
 };
 
