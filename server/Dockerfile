@@ -11,7 +11,8 @@ ENV NODE_ENV=production
 ENV PORT=10000
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# The CPU runtime is bundled; Render does not need the optional CUDA download.
+RUN ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src
 COPY scripts ./scripts
