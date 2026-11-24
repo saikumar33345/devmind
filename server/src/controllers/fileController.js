@@ -1,14 +1,12 @@
-import fs from 'fs/promises';
-import path from 'path';
 import Project from '../models/Project.js';
 import ProjectFile from '../models/ProjectFile.js';
 import Checkpoint from '../models/Checkpoint.js';
-import { UPLOAD_DIR } from '../middleware/upload.js';
+import { fileStorage } from '../utils/fileStorage.js';
 import { chunkText } from '../utils/chunking.js';
-import { addCodeChunks, deleteCodeFileChunks, queryCodeChunks } from '../utils/chroma.js';
+import { addCodeChunks, deleteCodeFileChunks, queryCodeChunks } from '../utils/vectorStore.js';
 import { callLLM } from '../utils/llm.js';
 
-const readFileContent = (file) => fs.readFile(path.join(UPLOAD_DIR, file.storedName), 'utf8');
+const readFileContent = async (file) => (await fileStorage.readFile(file)).toString('utf8');
 
 const reindexFile = async (file, content) => {
   await deleteCodeFileChunks(file.project, file._id);
@@ -24,19 +22,26 @@ export const uploadFile = async (req, res) => {
   if (!project) return res.status(404).json({ message: 'Project not found' });
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-  const file = await ProjectFile.create({
-    project: project._id,
-    user: req.user._id,
-    originalName: req.file.originalname,
-    storedName: req.file.filename,
-    mimeType: req.file.mimetype,
-    size: req.file.size
-  });
+  const blob = await fileStorage.saveUpload(req.file, { user: String(req.user._id), project: String(project._id) });
+  let file;
+  try {
+    file = await ProjectFile.create({
+      project: project._id,
+      user: req.user._id,
+      originalName: req.file.originalname,
+      ...blob,
+      mimeType: req.file.mimetype,
+      size: req.file.size
+    });
+  } catch (error) {
+    await fileStorage.discardBlob(blob.storageId).catch((cleanupError) => console.error('Upload rollback failed:', cleanupError.message));
+    throw error;
+  }
 
   // Best-effort: index the file for semantic codebase search. A failure here
   // shouldn't fail the upload — the file is already saved and usable as chat context.
   try {
-    const content = await fs.readFile(path.join(UPLOAD_DIR, req.file.filename), 'utf8');
+    const content = req.file.buffer.toString('utf8');
     const chunks = chunkText(content, { chunkSize: 800, overlap: 100 });
     await addCodeChunks(project._id, file._id, file.originalName, chunks);
   } catch (err) {
@@ -60,7 +65,7 @@ export const deleteFile = async (req, res) => {
   const file = await ProjectFile.findOne({ _id: req.params.id, user: req.user._id });
   if (!file) return res.status(404).json({ message: 'File not found' });
 
-  await fs.unlink(path.join(UPLOAD_DIR, file.storedName)).catch(() => {});
+  await fileStorage.deleteFile(file);
   await deleteCodeFileChunks(file.project, file._id);
   await file.deleteOne();
   res.json({ message: 'File deleted' });
@@ -88,12 +93,12 @@ export const getFilesContext = async (projectId) => {
   for (const file of files) {
     if (budget <= 0) break;
     try {
-      const content = await fs.readFile(path.join(UPLOAD_DIR, file.storedName), 'utf8');
+      const content = await readFileContent(file);
       const snippet = content.slice(0, budget);
       blocks.push(`### ${file.originalName}\n\`\`\`\n${snippet}\n\`\`\``);
       budget -= snippet.length;
     } catch {
-      // File missing on disk — skip silently, don't fail the whole chat request.
+      // Skip an unavailable file without failing the whole chat request.
     }
   }
   return blocks.length ? `Project files:\n${blocks.join('\n\n')}` : '';
@@ -131,7 +136,7 @@ export const proposeFileEdit = async (req, res) => {
 
 // POST /api/files/:id/apply  { newContent }
 // Accepts a proposed change: snapshots the current content as a checkpoint, then
-// actually overwrites the file on disk and re-indexes it.
+// saves the new content in GridFS and re-indexes it.
 export const applyFileEdit = async (req, res) => {
   const file = await ProjectFile.findOne({ _id: req.params.id, user: req.user._id });
   if (!file) return res.status(404).json({ message: 'File not found' });
@@ -150,9 +155,7 @@ export const applyFileEdit = async (req, res) => {
     content: oldContent
   });
 
-  await fs.writeFile(path.join(UPLOAD_DIR, file.storedName), newContent, 'utf8');
-  file.size = Buffer.byteLength(newContent, 'utf8');
-  await file.save();
+  await fileStorage.replaceFile(file, newContent);
   await reindexFile(file, newContent);
 
   res.json({ message: 'Change applied', file });
@@ -186,9 +189,7 @@ export const restoreCheckpoint = async (req, res) => {
     content: currentContent
   });
 
-  await fs.writeFile(path.join(UPLOAD_DIR, file.storedName), checkpoint.content, 'utf8');
-  file.size = Buffer.byteLength(checkpoint.content, 'utf8');
-  await file.save();
+  await fileStorage.replaceFile(file, checkpoint.content);
   await reindexFile(file, checkpoint.content);
 
   res.json({ message: 'Checkpoint restored', file });

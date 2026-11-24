@@ -1,5 +1,3 @@
-import fs from 'fs/promises';
-import path from 'path';
 import Project from '../models/Project.js';
 import Message from '../models/Message.js';
 import Conversation from '../models/Conversation.js';
@@ -8,8 +6,8 @@ import Task from '../models/Task.js';
 import ProjectMemory from '../models/ProjectMemory.js';
 import Checkpoint from '../models/Checkpoint.js';
 import GithubConnection from '../models/GithubConnection.js';
-import { UPLOAD_DIR } from '../middleware/upload.js';
-import { deleteProjectCodeCollection } from '../utils/chroma.js';
+import { fileStorage } from '../utils/fileStorage.js';
+import { deleteProjectCodeCollection } from '../utils/vectorStore.js';
 
 // GET /api/projects
 export const getProjects = async (req, res) => {
@@ -50,12 +48,12 @@ export const updateProject = async (req, res) => {
   res.json(project);
 };
 
-// Deletes everything scoped to a project: files on disk, its Chroma code collection,
+// Deletes everything scoped to a project: stored files, its vector namespace,
 // and every dependent Mongo collection. Shared by single-project deletion and full
 // account deletion so both stay in sync as new project-scoped data is added.
 export const cascadeDeleteProjectData = async (projectId) => {
   const files = await ProjectFile.find({ project: projectId });
-  await Promise.all(files.map((f) => fs.unlink(path.join(UPLOAD_DIR, f.storedName)).catch(() => {})));
+  for (const file of files) await fileStorage.deleteFile(file);
   await ProjectFile.deleteMany({ project: projectId });
   await deleteProjectCodeCollection(projectId);
 
@@ -69,10 +67,11 @@ export const cascadeDeleteProjectData = async (projectId) => {
 
 // DELETE /api/projects/:id
 export const deleteProject = async (req, res) => {
-  const project = await Project.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+  const project = await Project.findOne({ _id: req.params.id, user: req.user._id });
   if (!project) return res.status(404).json({ message: 'Project not found' });
 
   await cascadeDeleteProjectData(project._id);
+  await project.deleteOne();
   res.json({ message: 'Project deleted' });
 };
 

@@ -1,19 +1,13 @@
 @echo off
-echo =========================================
-echo DevMind AI - Startup Script
-echo =========================================
+setlocal
 
-echo Starting Chroma DB...
-start "Chroma DB Server" cmd /k "cd server && npm run chroma"
+if not exist "%~dp0server\.env" (
+  echo Create server\.env from server\.env.example before starting the app.
+  exit /b 1
+)
 
-echo Starting Backend Server...
-start "Backend Server" cmd /k "cd server && npm run dev"
+start "DevMind API" /D "%~dp0server" cmd /k "npm.cmd run dev"
+start "DevMind Web" /D "%~dp0client" cmd /k "npm.cmd run dev"
 
-echo Starting Frontend Client...
-start "Frontend Client" cmd /k "cd client && npm run dev"
-
-echo.
-echo All services have been launched in separate windows!
-echo Once the Vite server is ready, you can access the frontend at http://localhost:5173
-echo.
-pause
+echo Frontend: http://localhost:5173
+echo Local Chroma users must start Chroma separately as described in README.md.

@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.*
+!.env.example
+uploads
+chroma_data
+coverage
+*.log
+.git

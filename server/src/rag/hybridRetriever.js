@@ -1,4 +1,4 @@
-import { queryDenseWithEmbeddings, getAllChunksIn } from '../utils/chroma.js';
+import { queryDenseWithEmbeddings, getAllChunksIn } from '../utils/vectorStore.js';
 import { buildBM25Index, bm25Search } from './bm25.js';
 import { reciprocalRankFusion, mmrSelect } from './fusion.js';
 import { rerank } from './rerankerService.js';
@@ -9,7 +9,7 @@ import { RAG_CONFIG } from './config.js';
 
 const denseSearch = async (collectionName, query, topK) => {
   const results = await queryDenseWithEmbeddings(collectionName, query, topK);
-  // Chroma's default distance is cosine distance, so similarity = 1 - distance.
+  // The vector store returns cosine distance, so similarity = 1 - distance.
   return results.map((r) => ({
     id: r.id,
     text: r.text,

@@ -5,7 +5,8 @@ const projectFileSchema = new mongoose.Schema(
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     originalName: { type: String, required: true },
-    storedName: { type: String, required: true }, // filename on disk
+    storedName: { type: String, required: true },
+    storageId: { type: mongoose.Schema.Types.ObjectId, default: null }, // GridFS; null means a legacy local file
     mimeType: { type: String, default: 'text/plain' },
     size: { type: Number, required: true }
   },

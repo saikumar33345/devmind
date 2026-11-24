@@ -1,44 +1,28 @@
-# DevMind — AI Developer and Study Assistant
+# DevMind
 
-DevMind is a React, Express, and MongoDB application for project conversations, AI-assisted development, and studying with uploaded materials. It uses Sarvam for language-model responses and Chroma for semantic retrieval.
+An AI assistant for software projects and studying from uploaded materials.
 
 ## Features
 
-- Six developer agents: Planner, Coder, Debugger, Docs, Reviewer, and Tester, with automatic routing or manual selection.
-- Streaming chat through Server-Sent Events and conversation history in MongoDB.
-- Project workspaces, instructions, tasks, uploaded code files, and project memory.
-- Retrieval-augmented generation (RAG) for code and study materials, combining vector search, BM25, and reranking.
-- Study plans, quizzes, examinations, progress tracking, and results analysis.
-- JWT authentication, bcrypt password hashing, email OTP verification, and password reset.
+- Project chats with Planner, Coder, Debugger, Docs, Reviewer, and Tester agents.
+- Project files, tasks, instructions, and saved project context.
+- Study plans, quizzes, exams, and progress tracking.
+- Email verification, password reset, and conversation history.
 
-GitHub connection status has an API endpoint, but an OAuth connection flow is not implemented yet.
+## Stack
 
-## Stack and dependencies
+| Area | Technology |
+| --- | --- |
+| Frontend | React, Vite, Tailwind CSS |
+| Backend | Node.js, Express |
+| Database and file storage | MongoDB, Mongoose, GridFS |
+| Vector search | Qdrant |
+| AI responses | Sarvam |
+| Email | Resend |
 
-| Component | Technology | Dependency file |
-| --- | --- | --- |
-| Frontend | React 18, Vite 5, Tailwind CSS, React Router, Axios | `client/package.json` |
-| Backend | Node.js, Express, MongoDB/Mongoose, JWT, bcryptjs | `server/package.json` |
-| AI | Sarvam (`sarvam-105b-conversations`), using native `fetch` | Configured with `SARVAM_API_KEY` |
-| Retrieval | Chroma, local embeddings, local cross-encoder reranker | Node packages in `server/package.json`; local Chroma server in `requirements.txt` |
-| Email | Resend HTTP API | Configured with `RESEND_API_KEY` |
-| Cache | In-process LRU; optional Redis | `server/package.json` |
+## Setup
 
-`requirements.txt` contains only the Python dependency for a local Chroma server. JavaScript dependencies are installed with npm. Python is unnecessary when using Chroma Cloud.
-
-## Prerequisites
-
-- **Node.js 22.14 or a newer 22.x release**, with npm. Node 18 is insufficient for the current backend dependencies and test runner.
-- **Python 3.12** with pip for local Chroma (recommended). The pinned Chroma package declares Python 3.9 or newer.
-- A reachable **MongoDB** database, either Atlas or a local instance.
-- A **Sarvam API key** with access to the configured model.
-- A **Resend API key** and an allowed sender/recipient configuration for OTP emails.
-
-Local embedding and reranking models download on first use. Allow network access and additional startup time. Redis is optional.
-
-## Local setup
-
-### 1. Clone and install JavaScript dependencies
+Requires Node.js 22.14 or later in the 22.x series, npm, and accounts for MongoDB Atlas, Qdrant Cloud, Sarvam, and Resend.
 
 ```bash
 git clone https://github.com/saikumar33345/devmind.git
@@ -47,159 +31,128 @@ npm --prefix server ci
 npm --prefix client ci
 ```
 
-On Windows PowerShell, use `npm.cmd` if the execution policy blocks `npm.ps1`; for example, `npm.cmd --prefix server ci`.
+Copy `server/.env.example` to `server/.env` and `client/.env.example` to `client/.env`. Keep existing environment files if they are already configured.
 
-### 2. Install the local Chroma server
+On Windows, use `npm.cmd` if PowerShell blocks `npm`. You can also run `install.bat` to install the JavaScript dependencies.
 
-From the project root:
+### Environment variables
 
-**Windows PowerShell:**
+Configure these values in `server/.env`:
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-**Windows Command Prompt:**
-
-```bat
-python -m venv .venv
-call .venv\Scripts\activate.bat
-python -m pip install -r requirements.txt
-```
-
-**macOS / Linux:**
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-See [Chroma client/server documentation](https://docs.trychroma.com/production/chroma-server/client-server-mode) and the [pinned Python package](https://pypi.org/project/chromadb/1.5.9/). With Chroma Cloud, skip this step and configure the Cloud variables below.
-
-### 3. Configure environment variables
-
-Copy `server/.env.example` to `server/.env` and `client/.env.example` to `client/.env`. Keep existing `.env` files if already configured.
-
-**Backend (`server/.env`):**
-
-```env
-PORT=5000
-MONGODB_URI=mongodb://127.0.0.1:27017/devmind
-JWT_SECRET=replace-with-a-long-random-secret
-SARVAM_API_KEY=your-sarvam-api-key
-RESEND_API_KEY=your-resend-api-key
-RESEND_FROM_EMAIL=DevMind <onboarding@resend.dev>
-SKIP_OTP_VERIFICATION=false
-CLIENT_URL=http://localhost:5173
-```
-
-Use your Atlas connection string instead of the local MongoDB URI if applicable. Configure a verified Resend sender when sending to recipients beyond those allowed by the default sender.
-
-| Optional variable | Purpose |
+| Variable | Value |
 | --- | --- |
-| `CHROMA_HOST`, `CHROMA_PORT` | Local Chroma address; defaults to `localhost:8000` |
-| `CHROMA_API_KEY`, `CHROMA_TENANT`, `CHROMA_DATABASE` | Chroma Cloud credentials; setting the API key selects Cloud |
-| `RERANKER_PROVIDER` | `local` (default) loads the cross-encoder; `llm` uses Sarvam instead |
-| `REDIS_URL` | Shared Redis cache; omit to use the in-process cache |
-| `CONTACT_NOTIFY_EMAIL` | Recipient for optional contact-form email notifications |
+| `MONGODB_URI` | MongoDB connection string, including the database name |
+| `JWT_SECRET` | A long, random secret for login tokens |
+| `SARVAM_API_KEY` | Sarvam API key |
+| `RESEND_API_KEY` | Resend API key |
+| `RESEND_FROM_EMAIL` | An allowed Resend sender |
+| `QDRANT_URL` | Qdrant cluster REST endpoint |
+| `QDRANT_API_KEY` | Qdrant API key with read/write access |
+| `CLIENT_URL` | Frontend origin; `http://localhost:5173` locally |
 
-Keep `SKIP_OTP_VERIFICATION=false` for normal authentication. Setting it to `true` bypasses signup/login OTP checks for local development. Password-reset emails still require Resend.
+`QDRANT_COLLECTION` defaults to `devmind_chunks`. Collections are created automatically. MongoDB stores the application data and uploaded files; Qdrant stores the searchable text chunks and vectors.
 
-**Frontend (`client/.env`):**
+Keep `SKIP_OTP_VERIFICATION=false` for normal email verification. Redis is optional; leave `REDIS_URL` empty to use the in-process cache.
+
+The frontend reads its API address from `client/.env`:
 
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
 
-Claude/OpenAI keys are not used by the current implementation. Changing providers requires a code change in `server/src/utils/llm.js`.
+### Run locally
 
-### 4. Start the services
-
-Use three terminals from the project root.
-
-**Terminal 1 — Chroma (PowerShell):**
-
-```powershell
-.\.venv\Scripts\chroma.exe run --path ./server/chroma_data --port 8000
-```
-
-With the virtual environment activated on Command Prompt, macOS, or Linux, you can instead run:
-
-```bash
-npm --prefix server run chroma
-```
-
-**Terminal 2 — backend:**
+Start the backend and frontend in separate terminals:
 
 ```bash
 npm --prefix server run dev
 ```
 
-**Terminal 3 — frontend:**
-
 ```bash
 npm --prefix client run dev
 ```
 
-Open **http://localhost:5173**. The backend health endpoint is **http://localhost:5000/**. Wait for Chroma before uploading files or using retrieval. Backend health alone does not check Chroma, Sarvam, or email delivery.
+Open `http://localhost:5173`. On Windows, `run.bat` opens both services in separate terminals.
 
-With Chroma Cloud, only the backend and frontend terminals are needed.
+Embeddings run locally in the backend and download their model on first use. The default reranker also runs locally. Set `RERANKER_PROVIDER=llm` to use Sarvam for reranking instead.
 
-The Windows helpers `install.bat` and `run.bat` install/start the same services. Activate your Python environment in Command Prompt first so `pip` and `chroma` are on PATH. `run.bat` opens three service windows.
+## Commands
 
-## Checks
+Run these commands from the repository root:
 
-```bash
-# Backend unit tests
-npm --prefix server test
+| Command | Purpose |
+| --- | --- |
+| `npm --prefix server test` | Run backend tests |
+| `npm --prefix server run check:qdrant` | Check the Qdrant connection without changing data |
+| `npm --prefix client run build` | Build the frontend |
+| `npm --prefix server start` | Start the backend without file watching |
 
-# Frontend production build
-npm --prefix client run build
-```
+## Deployment
 
-For a full smoke check, confirm MongoDB connects, open the landing and authentication pages, sign up with an email that can receive OTPs, create a project, send a chat message, and upload study material or a code file. Unit tests and a frontend build do not prove external credentials or email delivery work.
+### Render
+
+Create a Blueprint from `render.yaml`. It builds the backend from `server/Dockerfile` using Node.js 22 and the free compute plan.
+
+Supply the prompted environment variables and allow the service's outbound IP ranges in Atlas Network Access. Set `CLIENT_URL` to the Vercel production origin, without a trailing slash.
+
+The Blueprint uses `RERANKER_PROVIDER=llm`. Embeddings still run in the backend. Uploaded files persist in Atlas through GridFS and count toward the database's storage quota.
+
+### Vercel
+
+Import the same repository with these settings:
+
+| Setting | Value |
+| --- | --- |
+| Root directory | `client` |
+| Framework | Vite |
+| Node.js version | 22.x |
+| Install command | `npm ci` |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+
+Set `VITE_API_URL` to the Render backend URL followed by `/api`, then redeploy. Keep API keys and database credentials in Render. `client/vercel.json` handles frontend routes.
 
 ## Project structure
 
 ```text
 devmind/
-├── client/
-│   ├── src/
-│   │   ├── api/             # Backend API clients
-│   │   ├── components/      # Chat, dashboard, study, exam, and shared UI
-│   │   ├── context/         # Authentication and project state
-│   │   ├── pages/           # Application routes
-│   │   └── utils/
-│   ├── .env.example
-│   └── package.json
-├── server/
-│   ├── src/
-│   │   ├── agents/          # Developer, study, exam, and results agents
-│   │   ├── controllers/
-│   │   ├── middleware/
-│   │   ├── models/          # MongoDB schemas
-│   │   ├── rag/             # Retrieval pipeline and evaluation tools
-│   │   ├── routes/
-│   │   ├── utils/           # LLM, Chroma, email, parsing, and cache helpers
-│   │   └── server.js
-│   ├── .env.example
-│   └── package.json
-├── requirements.txt         # Python Chroma server dependency
-├── install.bat
-└── run.bat
+|-- client/
+|   |-- public/
+|   |-- src/
+|   |   |-- api/
+|   |   |-- components/
+|   |   |-- context/
+|   |   |-- pages/
+|   |   `-- utils/
+|   |-- .env.example
+|   `-- package.json
+|-- server/
+|   |-- scripts/
+|   |-- src/
+|   |   |-- agents/
+|   |   |-- config/
+|   |   |-- controllers/
+|   |   |-- middleware/
+|   |   |-- models/
+|   |   |-- rag/
+|   |   |-- routes/
+|   |   `-- utils/
+|   |-- .env.example
+|   |-- Dockerfile
+|   `-- package.json
+|-- install.bat
+|-- render.yaml
+|-- requirements.txt
+`-- run.bat
 ```
 
-Local `.env` files, `node_modules`, uploads, Chroma data, and Python environments are excluded from Git.
+## Local Chroma (optional)
 
-## Deployment
+The backend also supports a local Chroma server when `QDRANT_URL` and `QDRANT_API_KEY` are unset. Python is only needed for this option.
 
-- Build with `npm --prefix client run build` and deploy `client/dist` to a static host. Configure SPA fallback; `client/vercel.json` provides Vercel rewrites.
-- Set `VITE_API_URL` to the deployed backend's `/api` URL before building.
-- Run the backend with `npm --prefix server start` on a host with the supported Node version. Configure its environment variables and MongoDB connectivity.
-- Set `CLIENT_URL` to the frontend origin for CORS.
-- Configure Chroma Cloud or a reachable Chroma server. File retrieval requires Chroma even when ordinary chat works.
-- Uploads use local disk under `server/uploads`; use persistent storage to preserve them across redeployments.
-- The default local reranker needs memory and a first-run model download. `RERANKER_PROVIDER=llm` selects Sarvam-based reranking.
-- Redis is optional; configure it when backend instances need a shared cache.
+```bash
+python -m pip install -r requirements.txt
+npm --prefix server run chroma
+```
+
+The default address is `localhost:8000`. Use `CHROMA_HOST` and `CHROMA_PORT` to change it. Local Chroma data stays separate from Qdrant.

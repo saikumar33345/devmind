@@ -3,7 +3,7 @@ import QuizAttempt from '../models/QuizAttempt.js';
 import Exam from '../models/Exam.js';
 import ExamAttempt from '../models/ExamAttempt.js';
 import ExamRecommendation from '../models/ExamRecommendation.js';
-import { queryChunks } from '../utils/chroma.js';
+import { queryChunks } from '../utils/vectorStore.js';
 import { computeTopicStatsFromAttempts } from './studyQuizController.js';
 import { computeTopicPerformance } from '../utils/analytics.js';
 import {

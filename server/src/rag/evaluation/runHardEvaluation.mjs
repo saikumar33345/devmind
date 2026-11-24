@@ -5,7 +5,7 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import RagParentChunk from '../../models/RagParentChunk.js';
 import { chunkStructured } from '../chunking.js';
-import { addStructuredChunks, deleteStudyPlanCollection } from '../../utils/chroma.js';
+import { addStructuredChunks, deleteStudyPlanCollection } from '../../utils/vectorStore.js';
 import { askStudyAgent } from '../../agents/studyAgent.js';
 import { runEvaluation } from './runner.js';
 import { formatComparisonReport } from './report.js';

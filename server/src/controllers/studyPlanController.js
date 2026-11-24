@@ -1,5 +1,3 @@
-import fs from 'fs/promises';
-import path from 'path';
 import StudyPlan from '../models/StudyPlan.js';
 import StudyMaterial from '../models/StudyMaterial.js';
 import Quiz from '../models/Quiz.js';
@@ -8,12 +6,12 @@ import Exam from '../models/Exam.js';
 import ExamAttempt from '../models/ExamAttempt.js';
 import ExamRecommendation from '../models/ExamRecommendation.js';
 import RagParentChunk from '../models/RagParentChunk.js';
-import { STUDY_UPLOAD_DIR } from '../middleware/studyUpload.js';
+import { fileStorage } from '../utils/fileStorage.js';
 import { extractText } from '../utils/documentParser.js';
 import {
   deleteMaterialChunks, deleteStudyPlanCollection, queryChunks,
   addStructuredChunks, studyCollectionName
-} from '../utils/chroma.js';
+} from '../utils/vectorStore.js';
 import { chunkStructured } from '../rag/chunking.js';
 import { runRagPipeline } from '../rag/pipeline.js';
 import { askStudyAgent } from '../agents/studyAgent.js';
@@ -89,12 +87,12 @@ export const updateStudyPlan = async (req, res) => {
   res.json(plan);
 };
 
-// Deletes everything scoped to a study plan: material files on disk, its Chroma
-// collection, and every dependent Mongo collection. Shared by single-plan deletion
+// Deletes everything scoped to a study plan: stored materials, its vector
+// namespace, and every dependent Mongo collection. Shared by single-plan deletion
 // and full account deletion so both stay in sync as new plan-scoped data is added.
 export const cascadeDeleteStudyPlanData = async (planId) => {
   const materials = await StudyMaterial.find({ studyPlan: planId });
-  await Promise.all(materials.map((m) => fs.unlink(path.join(STUDY_UPLOAD_DIR, m.storedName)).catch(() => {})));
+  for (const material of materials) await fileStorage.deleteFile(material, 'study');
   await StudyMaterial.deleteMany({ studyPlan: planId });
   await deleteStudyPlanCollection(planId);
   await RagParentChunk.deleteMany({ collectionName: studyCollectionName(planId) });
@@ -107,10 +105,11 @@ export const cascadeDeleteStudyPlanData = async (planId) => {
 
 // DELETE /api/study-plans/:id
 export const deleteStudyPlan = async (req, res) => {
-  const plan = await StudyPlan.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+  const plan = await StudyPlan.findOne({ _id: req.params.id, user: req.user._id });
   if (!plan) return res.status(404).json({ message: 'Study plan not found' });
 
   await cascadeDeleteStudyPlanData(plan._id);
+  await plan.deleteOne();
   await Promise.all([
     invalidateResultsCache(req.user._id),
     cacheDelByPrefix(`progress:${req.user._id}:${plan._id}`)
@@ -134,19 +133,25 @@ export const uploadMaterial = async (req, res) => {
   if (!plan) return res.status(404).json({ message: 'Study plan not found' });
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-  const material = await StudyMaterial.create({
-    studyPlan: plan._id,
-    user: req.user._id,
-    originalName: req.file.originalname,
-    storedName: req.file.filename,
-    mimeType: req.file.mimetype,
-    size: req.file.size,
-    status: 'processing'
-  });
+  const blob = await fileStorage.saveUpload(req.file, { user: String(req.user._id), studyPlan: String(plan._id) });
+  let material;
+  try {
+    material = await StudyMaterial.create({
+      studyPlan: plan._id,
+      user: req.user._id,
+      originalName: req.file.originalname,
+      ...blob,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+      status: 'processing'
+    });
+  } catch (error) {
+    await fileStorage.discardBlob(blob.storageId).catch((cleanupError) => console.error('Upload rollback failed:', cleanupError.message));
+    throw error;
+  }
 
   try {
-    const filePath = path.join(STUDY_UPLOAD_DIR, req.file.filename);
-    const text = await extractText(filePath, req.file.originalname);
+    const text = await extractText(req.file.buffer, req.file.originalname);
     const { parents, children } = chunkStructured(text);
 
     if (children.length === 0) {
@@ -198,7 +203,7 @@ export const deleteMaterial = async (req, res) => {
   const material = await StudyMaterial.findOne({ _id: req.params.materialId, studyPlan: plan._id });
   if (!material) return res.status(404).json({ message: 'Material not found' });
 
-  await fs.unlink(path.join(STUDY_UPLOAD_DIR, material.storedName)).catch(() => {});
+  await fileStorage.deleteFile(material, 'study');
   await deleteMaterialChunks(plan._id, material._id);
   await RagParentChunk.deleteMany({ collectionName: studyCollectionName(plan._id), documentId: String(material._id) });
   await material.deleteOne();

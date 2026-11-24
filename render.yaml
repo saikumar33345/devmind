@@ -1,0 +1,39 @@
+# Free backend + Qdrant Cloud. Original uploads persist in the existing MongoDB
+# database through GridFS; no Render disk or additional storage keys are required.
+services:
+  - type: web
+    name: devmind-api
+    runtime: docker
+    plan: free
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SKIP_OTP_VERIFICATION
+        value: "false"
+      # Saves reranker model memory; embedding inference still runs in Node.
+      - key: RERANKER_PROVIDER
+        value: llm
+      - key: CLIENT_URL
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: devmind_chunks
